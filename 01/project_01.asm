@@ -56,7 +56,7 @@ input_buffer:
   actual_size    db ?
   buffer_memory  db 30 dup(0)
 
-parsed_argument db 0
+parsed_arguments_number db 0
 error_code db 0
 
 data1 ends
@@ -66,7 +66,6 @@ data1 ends
 code1 segment
 
 start:
-
   ;inicjalizacja stosu
   mov ax, seg top1
   mov ss, ax
@@ -88,18 +87,55 @@ start:
 
   ;zakonczenie programu
   exit:
-    mov ax, 04c00h ;kod zakonczenia programu, error code = 0
+    mov ax, 04c00h ;kod zakonczenia programu, systemowy error code = 0
     int 21h ;wywolanie przerwania systemu DOS
 
 
   print_error_msg:
-    mov dx, offset hello_msg
-    mov ah, 9
-    int 21h
+    mov ax, error_code
+    cmp ax, 1
+    call invalid_first
+    jz exit
+    mov ax, error_code
+    cmp ax, 2
+    call invalid_second
+    jz exit
+    mov ax, error_code
+    cmp ax, 3
+    call invalid_third
+    jz exit
+    mov ax, error_code
+    cmp ax, 4
+    call invalid_input
+    jz exit
 
 
   new_line:
     mov dx, offset new_ln_chars
+    mov ah, 9
+    int 21h
+    ret
+
+  invalid_first:
+    mov dx, offset err_first
+    mov ah, 9
+    int 21h
+    ret
+
+  invalid_second:
+    mov dx, offset err_second
+    mov ah, 9
+    int 21h
+    ret
+
+  invalid_third:
+    mov dx, offset err_third
+    mov ah, 9
+    int 21h
+    ret
+
+  invalid_input:
+    mov dx, offset error_msg
     mov ah, 9
     int 21h
     ret
