@@ -1,4 +1,4 @@
-;Project 01 - Verbal Calculator
+;Project 01 - Verbal calculator
 ;Created by Filip SLazyk
 ;AGH UST 2019
 
@@ -59,6 +59,10 @@ input_buffer:
 parsed_arguments_number db 0
 error_code db 0
 
+in_first_word   db 30 dup(0)
+in_second_word  db 30 dup(0)
+in_third_word   db 30 dup(0)
+
 first_arg       db 0
 second_arg      db 0
 operation_code  db 0
@@ -95,32 +99,86 @@ start:
 ;///////////////////////////////////////////////////
 ;INPUT PARSING
 
+  ;sprawdzenie, czy na wejsciu znajduja sie trzy slowa
+  ;di przechowuje adres na aktualnie wczytywane slowo
+  input_check:
+    mov si, offset buffer_memory
+    skip_spaces0:
+      inc si
+      mov al, [ds][si-1]
+      cmp al, 20h  ;spacja
+      jz skip_spaces0
 
-;w SI będzie przechowywany indeks początku aktualnie rozpatrywanego slowa wejscia
-;w CL będzie przechowywany kod ASCII danej litery wejscia
-;
-;w DI będzie przechwowywany indeks początku aktualnie rozpatrywanego slowa wzorcowego
-;w BL będzie przechowywana rozpatrywana obecnie liczba
-;w BH będzie przechowywany kod ASCII danej litery wzorca
-
-  parse_loop:
-    mov cl, offset buffer_memory
-    mov ch, [ds][cl]
-
+    mov di, offset in_first_word
     arg1_loop:
+      cmp al, 0dh         ;Carriage Return
+      jz invalid_input
+      mov [di], al
+      inc di
+      inc si
+      mov al, [ds][si-1]
+      cmp al, 20h
+      jnz arg1_loop
 
-      jmp arg1_loop
+    mov al, '$'
+    mov [di], al
 
-    op_loop:
+    skip_spaces1:
+      inc si
+      mov al, [ds][si-1]
+      cmp al, 20h  ;spacja
+      jz skip_spaces1
 
-      jmp op_loop
-
+    mov di, offset in_second_word
     arg2_loop:
+      cmp al, 0dh         ;Carriage Return
+      jz invalid_input
+      mov [di], al
+      inc di
+      inc si
+      mov al, [ds][si-1]
+      cmp al, 20h
+      jnz arg2_loop
 
-      jmp calc_loop
+    mov al, '$'
+    mov [di], al
 
+    skip_spaces2:
+      inc si
+      mov al, [ds][si-1]
+      cmp al, 20h  ;spacja
+      jz skip_spaces2
 
-    jmp parse_loop
+    cmp al, 0dh         ;Carriage Return
+    jz invalid_input
+
+    mov di, offset in_third_word
+    arg3_loop:
+      mov [di], al
+      inc di
+      inc si
+      mov al, [ds][si-1]
+      cmp al, 20h
+      jz check_excess
+      cmp al, 0dh
+      jnz arg3_loop
+
+    mov al, '$'
+    mov [di], al
+    jmp exit
+
+    check_excess:
+      mov al, '$'
+      mov [di], al
+      skip_spaces3:
+        inc si
+        mov al, [ds][si-1]
+        cmp al, 20h  ;spacja
+        jz skip_spaces3
+      cmp al, 0dh
+      jnz invalid_input
+      jmp exit
+
 
 ;///////////////////////////////////////////////////
 
@@ -184,7 +242,7 @@ code1 ends
 ;segment stosu
 stack1 segment STACK
      dw 200 dup(?) ;wypelnij stos 200 dowolnymi slowami
-top1 dw ?          ;okresla wierzcholek stostu
+top1 dw ?          ;okresla wierzcholek stosu
 stack1 ends
 
 end start
