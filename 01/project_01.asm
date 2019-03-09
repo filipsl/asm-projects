@@ -59,6 +59,10 @@ input_buffer:
 parsed_arguments_number db 0
 error_code db 0
 
+first_arg       db 0
+second_arg      db 0
+operation_code  db 0
+
 data1 ends
 
 
@@ -67,7 +71,7 @@ code1 segment
 
 start:
   ;inicjalizacja stosu
-  mov ax, seg top1
+  mov al, seg top1
   mov ss, ax
   mov sp, offset top1
 
@@ -85,29 +89,50 @@ start:
     mov ah, 0ah
     int 21h
 
+  call new_line
+
+
+;///////////////////////////////////////////////////
+;INPUT PARSING
+
+
+;w SI będzie przechowywany indeks początku aktualnie rozpatrywanego slowa wejscia
+;w CL będzie przechowywany kod ASCII danej litery wejscia
+;
+;w DI będzie przechwowywany indeks początku aktualnie rozpatrywanego slowa wzorcowego
+;w BL będzie przechowywana rozpatrywana obecnie liczba
+;w BH będzie przechowywany kod ASCII danej litery wzorca
+
+  parse_loop:
+    mov cl, offset buffer_memory
+    mov ch, [ds][cl]
+
+    arg1_loop:
+
+      jmp arg1_loop
+
+    op_loop:
+
+      jmp op_loop
+
+    arg2_loop:
+
+      jmp calc_loop
+
+
+    jmp parse_loop
+
+;///////////////////////////////////////////////////
+
+
+  mov al, error_code
+  cmp al, 0
+  jnz print_error_msg
+
   ;zakonczenie programu
   exit:
     mov ax, 04c00h ;kod zakonczenia programu, systemowy error code = 0
     int 21h ;wywolanie przerwania systemu DOS
-
-
-  print_error_msg:
-    mov ax, error_code
-    cmp ax, 1
-    call invalid_first
-    jz exit
-    mov ax, error_code
-    cmp ax, 2
-    call invalid_second
-    jz exit
-    mov ax, error_code
-    cmp ax, 3
-    call invalid_third
-    jz exit
-    mov ax, error_code
-    cmp ax, 4
-    call invalid_input
-    jz exit
 
 
   new_line:
@@ -116,29 +141,42 @@ start:
     int 21h
     ret
 
+
+  print_error_msg:
+    mov al, error_code
+    cmp al, 1
+    jz invalid_first
+    mov al, error_code
+    cmp al, 2
+    jz invalid_second
+    mov al, error_code
+    cmp al, 3
+    jz invalid_third
+    jmp invalid_input ;domyslnie wypisywany jest blad wejscia
+
   invalid_first:
     mov dx, offset err_first
     mov ah, 9
     int 21h
-    ret
+    jmp exit
 
   invalid_second:
     mov dx, offset err_second
     mov ah, 9
     int 21h
-    ret
+    jmp exit
 
   invalid_third:
     mov dx, offset err_third
     mov ah, 9
     int 21h
-    ret
+    jmp exit
 
   invalid_input:
     mov dx, offset error_msg
     mov ah, 9
     int 21h
-    ret
+    jmp exit
 
 code1 ends
 
