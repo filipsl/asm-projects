@@ -450,21 +450,25 @@ start:
     mov di, offset result
     mov byte ptr ds:[di], al  ;zapisanie wyniku mnozenia w pamieci
 
-    
-;//////////////////////////////////////////WYPISYWANIE WYNIKU
+;//////////////////////////////////////////
+
+
+
+;///////////////////////////////////////////////////
+;WYPISYWANIE WYNIKU W TRYBIE TEKSTOWYM
+;///////////////////////////////////////////////////
 
   show_result:
-    mov dx, offset result_msg
+    mov dx, offset result_msg     ;wypisanie komunikatu o wyniku
     mov ah, 9
     int 21h
 
-    mov ax, offset minus_flag
-    mov si, ax
-    mov al, ds:[si]
+    mov si, offset minus_flag     ;sprawdzenie, czy wynik jest ujemny
+    mov al, byte ptr ds:[si]
     cmp al, 0
-    jz number_size_check
+    jz number_size_check    ;jesli nie trzeba wypisac "minus", przejdz do sprawdzenia czy wynik <= 20
 
-  show_minus:
+  show_minus:               ;wypisanie slowa "minus"
     mov dx, offset minus
     mov ah, 9
     int 21h
@@ -472,54 +476,54 @@ start:
     mov ah, 9
     int 21h
 
-  number_size_check:
+  number_size_check:        ;sprawdzenie, czy wynik <= 20
     mov si, offset result
     mov ah, 20
-    mov al, ds:[si]
+    mov al, byte ptr ds:[si]
     cmp ah, al
     jc more_than_twenty   ;sprawdza, czy wynik mozna wypisac jednym slowem (czyli czy nie jest wiekszy niz 20)
 
-    print_single_number:
-      mov cl, 0
+    print_single_number:  ;jesli wynik <= 20, znajdz odpowiednie slowo i je wypisz
+      mov cl, 0           ;akutalnie wybrany wzorzec
       mov si, offset zero
 
       select_number_loop:
         cmp al, cl
-        jz print_number
-          move_to_next_number:
+        jz print_number  ;jesli znaleziono wlasciwy wzorzec, wypisz go
+          move_to_next_number:  ;przejdz do kolejnego wzorca
             mov ah, '$'
             inc si
             cmp ds:[si-1], ah
             jnz move_to_next_number
-            inc cl
+            inc cl               ;rozpatrywany jest kolejny wzorzec
             jmp select_number_loop
 
 
-  print_number:
+  print_number: ;wypisanie pojedynczej liczby na ekran (od 0 do 20), lub cyfry jednosci (dla wynikow > 20)
     mov ax, si
     mov dx, ax
     mov ah, 9
     int 21h
     jmp exit
 
-  more_than_twenty:
+  more_than_twenty:   ;w AL zapisany jest wynik do wypisania
     mov ah, 0
     mov ch, 10
-    div ch
+    div ch            ;dzielenie wyniku przez 10, w AL wynik dzielenia, w AH reszta
     mov si, offset twenty
     mov cl, 2
     select_number_loop_tens:
       cmp al, cl
-      jz print_number_tens
-        move_to_next_number_tens:
+      jz print_number_tens     ;jesli znaleziono odpowiednia wielokrotnosc dziesieciu, wypisz liczbe
+        move_to_next_number_tens: ;przejscie do kolejnego wzoraca wielokrotnosci liczby dziesiec
           mov ah, '$'
           inc si
-          cmp ds:[si-1], ah
+          cmp byte ptr ds:[si-1], ah
           jnz move_to_next_number_tens
-          inc cl
+          inc cl                  ;rozpatrywanie kolejnej wielokrotnosci dziesieciu
           jmp select_number_loop_tens
 
-  print_number_tens:
+  print_number_tens:  ;wypisanie odpowiedniej wielokrotnosci dziesieciu
     mov ax, si
     mov dx, ax
     mov ah, 9
@@ -529,54 +533,67 @@ start:
     int 21h
 
     mov si, offset result
-    mov al, ds:[si]
+    mov al, byte ptr ds:[si]  ;pobranie z pamieci wyniku dzialania
     mov ah, 0
     mov ch, 10
-    div ch
-    mov al, ah
+    div ch                    ;dzielenie wyniku przez 10, cyfra jednosci (reszta dzielenia) zapisana w AH
+    mov al, ah                ;przeniesienie cyfry jednosci do AL, w celu ewentualnego wypisania
     cmp al, 0
     jnz print_single_number
+;///////////////////////////////////////////////////
 
-  ;zakonczenie programu
+
+
+;///////////////////////////////////////////////////
+;ZAKONCZENIE PROGRAMU
+;///////////////////////////////////////////////////
+
   exit:
     mov ax, 04c00h ;kod zakonczenia programu, systemowy error code = 0
-    int 21h ;wywolanie przerwania systemu DOS
+    int 21h ;wywolanie przerwania systemu DOS, zakonczenie dzialania programu
+;///////////////////////////////////////////////////
 
 
-  new_line:
+
+;///////////////////////////////////////////////////
+;DODATKOWE FUNKCJE I OBSLUGA BLEDOW
+;///////////////////////////////////////////////////
+
+
+  new_line:         ;sluzy do wypisania nowej linii
     mov dx, offset new_ln_chars
     mov ah, 9
     int 21h
     ret
 
-  invalid_first:
+  invalid_first:    ;wypisanie komunikatu o blednym pierwszym argumencie
     mov dx, offset err_first
     mov ah, 9
     int 21h
     jmp exit
 
-  invalid_second:
+  invalid_second: ;wypisanie komunikatu o blednym drugim argumencie
     mov dx, offset err_second
     mov ah, 9
     int 21h
     jmp exit
 
-  invalid_third:
+  invalid_third:  ;wypisanie komunikatu o blednym trzecim argumencie
     mov dx, offset err_third
     mov ah, 9
     int 21h
     jmp exit
 
-  invalid_input:
+  invalid_input:  ;wypisanie komunikatu o blednym wejsciu
     mov dx, offset error_msg
     mov ah, 9
     int 21h
     jmp exit
-
+;///////////////////////////////////////////////////
 code1 ends
 
 
-;segment stosu
+;//////////////////////////SEGMENT STOSU/////////////////////////////////////
 stack1 segment STACK
      dw 200 dup(?) ;wypelnij stos 200 dowolnymi slowami
 top1 dw ?          ;okresla wierzcholek stosu
