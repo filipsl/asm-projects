@@ -15,40 +15,40 @@ err_second     db "Error - invalid second argument",10,13,'$';wiadmosc bledu - b
 err_third      db "Error - invalid third argument",10,13,'$';wiadmosc bledu - bledny trzeci argument
 
 ;definicja nazw liczb
-zero      db "zero",0
-one       db "one",0
-two       db "two",0
-three     db "three",0
-four      db "four",0
-five      db "five",0
-six       db "six",0
-seven     db "seven",0
-eight     db "eight",0
-nine      db "nine",0
+zero      db "zero$"
+one       db "one$"
+two       db "two$"
+three     db "three$"
+four      db "four$"
+five      db "five$"
+six       db "six$"
+seven     db "seven$"
+eight     db "eight$"
+nine      db "nine$"
 
-ten       db "ten",0
-eleven    db "eleven",0
-twelve    db "twelve",0
-thirteen  db "thirteen",0
-fourteen  db "fourteen",0
-fifteen   db "nineteen",0
-sixteen   db "sixteen",0
-seventeen db "seventeen",0
-eighteen  db "eighteen",0
-nineteen  db "nineteen",0
+ten       db "ten$"
+eleven    db "eleven$"
+twelve    db "twelve$"
+thirteen  db "thirteen$"
+fourteen  db "fourteen$"
+fifteen   db "nineteen$"
+sixteen   db "sixteen$"
+seventeen db "seventeen$"
+eighteen  db "eighteen$"
+nineteen  db "nineteen$"
 
-twenty    db "twenty",0
-thirty    db "thirty",0
-forty     db "forty",0
-fifty     db "fifty",0
-sixty     db "sixty",0
-seventy   db "seventy",0
-eighty    db "eighty",0
+twenty    db "twenty$"
+thirty    db "thirty$"
+forty     db "forty$"
+fifty     db "fifty$"
+sixty     db "sixty$"
+seventy   db "seventy$"
+eighty    db "eighty$"
 
 ;definicja nazw operacji
-plus  db "plus",0     ;kod operacji 0
-minus db "minus",0    ;kod operacji 1
-tim   db "times",0    ;kod operacji 2
+plus  db "plus$"     ;kod operacji 0
+minus db "minus$"    ;kod operacji 1
+tim   db "times$"    ;kod operacji 2
 
 ;bufor wejsciowy
 input_buffer:
@@ -75,7 +75,7 @@ code1 segment
 
 start:
   ;inicjalizacja stosu
-  mov al, seg top1
+  mov ax, seg top1
   mov ss, ax
   mov sp, offset top1
 
@@ -97,7 +97,7 @@ start:
 
 
 ;///////////////////////////////////////////////////
-;INPUT PARSING
+;WSTEPNE SPRAWDZENIE POPRAWNOSCI WEJSCIA
 
   ;sprawdzenie, czy na wejsciu znajduja sie trzy slowa
   ;di przechowuje adres na aktualnie wczytywane slowo
@@ -105,7 +105,7 @@ start:
     mov si, offset buffer_memory
     skip_spaces0:
       inc si
-      mov al, [ds][si-1]
+      mov al, byte ptr ds:[si-1]
       cmp al, 20h  ;spacja
       jz skip_spaces0
 
@@ -116,7 +116,7 @@ start:
       mov [di], al
       inc di
       inc si
-      mov al, [ds][si-1]
+      mov al, byte ptr ds:[si-1]
       cmp al, 20h
       jnz arg1_loop
 
@@ -125,7 +125,7 @@ start:
 
     skip_spaces1:
       inc si
-      mov al, [ds][si-1]
+      mov al, byte ptr ds:[si-1]
       cmp al, 20h  ;spacja
       jz skip_spaces1
 
@@ -136,7 +136,7 @@ start:
       mov [di], al
       inc di
       inc si
-      mov al, [ds][si-1]
+      mov al, byte ptr ds:[si-1]
       cmp al, 20h
       jnz arg2_loop
 
@@ -145,7 +145,7 @@ start:
 
     skip_spaces2:
       inc si
-      mov al, [ds][si-1]
+      mov al, byte ptr ds:[si-1]
       cmp al, 20h  ;spacja
       jz skip_spaces2
 
@@ -157,7 +157,7 @@ start:
       mov [di], al
       inc di
       inc si
-      mov al, [ds][si-1]
+      mov al, byte ptr ds:[si-1]
       cmp al, 20h
       jz check_excess
       cmp al, 0dh
@@ -172,18 +172,26 @@ start:
       mov [di], al
       skip_spaces3:
         inc si
-        mov al, [ds][si-1]
+        mov al, byte ptr ds:[si-1]
         cmp al, 20h  ;spacja
         jz skip_spaces3
       cmp al, 0dh
       jnz invalid_input
       jmp exit
+;///////////////////////////////////////////////////
+;---------------------------------------------------
 
 
 ;///////////////////////////////////////////////////
+;WLASCIWE PARSOWANIE POSZCZEGOLNYCH ARGUMENTOW
 
 
-  mov al, error_code
+
+;////////////////////////////////////////////////////
+;----------------------------------------------------
+
+
+  mov al, byte ptr ds:[error_code]
   cmp al, 0
   jnz print_error_msg
 
@@ -201,13 +209,13 @@ start:
 
 
   print_error_msg:
-    mov al, error_code
+    mov al, byte ptr ds:[error_code]
     cmp al, 1
     jz invalid_first
-    mov al, error_code
+    mov al, byte ptr ds:[error_code]
     cmp al, 2
     jz invalid_second
-    mov al, error_code
+    mov al, byte ptr ds:[error_code]
     cmp al, 3
     jz invalid_third
     jmp invalid_input ;domyslnie wypisywany jest blad wejscia
