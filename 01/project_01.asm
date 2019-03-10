@@ -31,7 +31,7 @@ eleven    db "eleven$"
 twelve    db "twelve$"
 thirteen  db "thirteen$"
 fourteen  db "fourteen$"
-fifteen   db "nineteen$"
+fifteen   db "fifteen$"
 sixteen   db "sixteen$"
 seventeen db "seventeen$"
 eighteen  db "eighteen$"
@@ -66,6 +66,8 @@ in_third_word   db 30 dup(0)
 first_arg       db 0
 second_arg      db 0
 operation_code  db 0
+
+
 
 data1 ends
 
@@ -185,7 +187,77 @@ start:
 ;///////////////////////////////////////////////////
 ;WLASCIWE PARSOWANIE POSZCZEGOLNYCH ARGUMENTOW
 
+;CL -> aktualnie sprawdzana cyfra -> jesli dochodzi do 10, to znaczy, ze jest bledny argument
+;SI -> ustawione na poczatek sprawdzanego obecnie argumentu
+;DI -> sluzy do iterowania po wzoracach slow oznaczajacych cyfry
 
+  mov cl, 0
+  ;mov si, offset in_first_word
+  mov di, offset zero
+
+  parse_arg1_loop:
+    mov al, cl
+    mov ah, 10
+    cmp ah, al
+    jz invalid_first
+
+    mov ax, offset in_first_word
+    mov si, ax
+
+    iterate_arg1_chars:
+      mov al, '$'
+      mov ah, byte ptr ds:[si]
+      cmp ah, al
+      jz arg1_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
+
+      mov al, '$'
+      mov ah, byte ptr ds:[di]
+      cmp ah, al
+      jz  pattern1_end_reached  ;osiagneto koniec wzorca
+
+      mov al, ds:[si]
+      mov ah, ds:[di]
+      cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
+      jz chars_match1
+      jmp move_to_next_pattern1 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
+
+
+      chars_match1:
+        inc di
+        inc si
+        jmp iterate_arg1_chars
+
+      pattern1_end_reached:
+        inc di ;ustaw di na poczatek nowego wzoraca
+        inc cl ;rozpatrywanie kolejnej cyfry
+
+      arg1_end_reached:   ;sprawdzanie, czy osiagnieto tez koniec wzorca
+        mov al, '$'
+        mov ah, byte ptr ds:[di]
+        cmp ah, al
+        jz save_arg1_value
+
+      move_to_next_pattern1:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
+        inc di
+        mov ah, ds:[di]
+        mov al, '$'
+        cmp ah, al
+        jnz move_to_next_pattern1
+        inc di      ;ustaw di na poczatek kolejnego wzorca
+        inc cl
+        jmp parse_arg1_loop
+
+      save_arg1_value:
+        mov al, cl
+        mov di, offset first_arg
+        mov ds:[di], al
+        jmp parse_arg2_loop
+
+;      finalize arg1_loop:
+;        inc cl
+;    jmp parse_arg1_loop
+
+  parse_arg2_loop:
 
 ;////////////////////////////////////////////////////
 ;----------------------------------------------------
