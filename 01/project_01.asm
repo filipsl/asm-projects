@@ -7,12 +7,13 @@
 data1 segment
 
 new_ln_chars   db 10,13,'$'                                 ;nowa linia
-hello_msg      db "Enter a description of a calculation: $" ;wiadomosc startowa
+space          db " $"                                       ;spacja
+hello_msg      db "Enter description of calculation: $" ;wiadomosc startowa
 result_msg     db "The result is: $"                        ;wiadomosc z wynikiem
-error_msg      db "Error - invalid input!",10,13,'$'        ;wiadmosc bledu - wprowadzono za malo lub za duzo argumentow
-err_first      db "Error - invalid first argument",10,13,'$';wiadmosc bledu - bledny pierwszy argument
-err_second     db "Error - invalid second argument",10,13,'$';wiadmosc bledu - bledny drugi argument
-err_third      db "Error - invalid third argument",10,13,'$';wiadmosc bledu - bledny trzeci argument
+error_msg      db "Error - invalid input!$"            ;wiadmosc bledu - wprowadzono za malo lub za duzo argumentow
+err_first      db "Error - invalid first argument$"    ;wiadmosc bledu - bledny pierwszy argument
+err_second     db "Error - invalid second argument$"   ;wiadmosc bledu - bledny drugi argument
+err_third      db "Error - invalid third argument$"    ;wiadmosc bledu - bledny trzeci argument
 
 ;definicja nazw liczb
 zero      db "zero$"
@@ -45,9 +46,6 @@ sixty     db "sixty$"
 seventy   db "seventy$"
 eighty    db "eighty$"
 
-space     db " $"
-
-
 ;definicja nazw operacji
 plus  db "plus$"     ;kod operacji 0
 minus db "minus$"    ;kod operacji 1
@@ -60,9 +58,6 @@ input_buffer:
   actual_size    db ?
   buffer_memory  db 30 dup(0)
 
-parsed_arguments_number db 0
-error_code db 0
-
 in_first_word   db 30 dup(0)
 in_second_word  db 30 dup(0)
 in_third_word   db 30 dup(0)
@@ -70,8 +65,8 @@ in_third_word   db 30 dup(0)
 first_arg       db 0
 second_arg      db 0
 third_arg       db 0
-result          db ?
 
+result          db ?
 minus_flag      db 0
 
 data1 ends
@@ -101,7 +96,6 @@ start:
     int 21h
 
   call new_line
-
 
 ;///////////////////////////////////////////////////
 ;WSTEPNE SPRAWDZENIE POPRAWNOSCI WEJSCIA
@@ -198,7 +192,6 @@ start:
 
   arg1_parsing:
     mov cl, 0
-    ;mov si, offset in_first_word
     mov ax, offset zero
     mov di, ax
 
@@ -491,24 +484,63 @@ start:
     cmp ah, al
     jc more_than_twenty   ;sprawdza, czy wynik mozna wypisac jednym slowem (czyli czy nie jest wiekszy niz 20)
 
-    mov cl, 0
+    print_single_number:
+      mov cl, 0
+      mov si, offset zero
 
-    select_number_loop:
-      cmp al, cl
-      jz print_number
-        move_to_next_number:
-        
+      select_number_loop:
+        cmp al, cl
+        jz print_number
+          move_to_next_number:
+            mov ah, '$'
+            inc si
+            cmp ds:[si-1], ah
+            jnz move_to_next_number
+            inc cl
+            jmp select_number_loop
 
 
-  print_number
-    mov
+  print_number:
+    mov ax, si
+    mov dx, ax
+    mov ah, 9
+    int 21h
+    jmp exit
 
   more_than_twenty:
+    mov ah, 0
+    mov ch, 10
+    div ch
+    mov si, offset twenty
+    mov cl, 2
+    select_number_loop_tens:
+      cmp al, cl
+      jz print_number_tens
+        move_to_next_number_tens:
+          mov ah, '$'
+          inc si
+          cmp ds:[si-1], ah
+          jnz move_to_next_number_tens
+          inc cl
+          jmp select_number_loop_tens
 
+  print_number_tens:
+    mov ax, si
+    mov dx, ax
+    mov ah, 9
+    int 21h
+    mov dx, offset space
+    mov ah, 9
+    int 21h
 
-  mov al, byte ptr ds:[error_code]
-  cmp al, 0
-  jnz print_error_msg
+    mov si, offset result
+    mov al, ds:[si]
+    mov ah, 0
+    mov ch, 10
+    div ch
+    mov al, ah
+    cmp al, 0
+    jnz print_single_number
 
   ;zakonczenie programu
   exit:
@@ -521,19 +553,6 @@ start:
     mov ah, 9
     int 21h
     ret
-
-
-  print_error_msg:
-    mov al, byte ptr ds:[error_code]
-    cmp al, 1
-    jz invalid_first
-    mov al, byte ptr ds:[error_code]
-    cmp al, 2
-    jz invalid_second
-    mov al, byte ptr ds:[error_code]
-    cmp al, 3
-    jz invalid_third
-    jmp invalid_input ;domyslnie wypisywany jest blad wejscia
 
   invalid_first:
     mov dx, offset err_first
