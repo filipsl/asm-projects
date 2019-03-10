@@ -45,10 +45,14 @@ sixty     db "sixty$"
 seventy   db "seventy$"
 eighty    db "eighty$"
 
+space     db " $"
+
+
 ;definicja nazw operacji
 plus  db "plus$"     ;kod operacji 0
 minus db "minus$"    ;kod operacji 1
 tim   db "times$"    ;kod operacji 2
+
 
 ;bufor wejsciowy
 input_buffer:
@@ -65,9 +69,10 @@ in_third_word   db 30 dup(0)
 
 first_arg       db 0
 second_arg      db 0
-operation_code  db 0
+third_arg       db 0
+result          db ?
 
-
+minus_flag      db 0
 
 data1 ends
 
@@ -167,7 +172,7 @@ start:
 
     mov al, '$'
     mov [di], al
-    jmp exit
+    jmp arg1_parsing
 
     check_excess:
       mov al, '$'
@@ -179,7 +184,7 @@ start:
         jz skip_spaces3
       cmp al, 0dh
       jnz invalid_input
-      jmp exit
+      jmp arg1_parsing
 ;///////////////////////////////////////////////////
 ;---------------------------------------------------
 
@@ -191,76 +196,314 @@ start:
 ;SI -> ustawione na poczatek sprawdzanego obecnie argumentu
 ;DI -> sluzy do iterowania po wzoracach slow oznaczajacych cyfry
 
-  mov cl, 0
-  ;mov si, offset in_first_word
-  mov di, offset zero
+  arg1_parsing:
+    mov cl, 0
+    ;mov si, offset in_first_word
+    mov ax, offset zero
+    mov di, ax
 
-  parse_arg1_loop:
-    mov al, cl
-    mov ah, 10
-    cmp ah, al
-    jz invalid_first
-
-    mov ax, offset in_first_word
-    mov si, ax
-
-    iterate_arg1_chars:
-      mov al, '$'
-      mov ah, byte ptr ds:[si]
+    parse_arg1_loop:
+      mov al, cl
+      mov ah, 10
       cmp ah, al
-      jz arg1_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
+      jz invalid_first
 
-      mov al, '$'
-      mov ah, byte ptr ds:[di]
-      cmp ah, al
-      jz  pattern1_end_reached  ;osiagneto koniec wzorca
+      mov ax, offset in_first_word
+      mov si, ax
 
-      mov al, ds:[si]
-      mov ah, ds:[di]
-      cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
-      jz chars_match1
-      jmp move_to_next_pattern1 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
+      iterate_arg1_chars:
+        mov al, '$'
+        mov ah, byte ptr ds:[si]
+        cmp ah, al
+        jz arg1_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
 
-
-      chars_match1:
-        inc di
-        inc si
-        jmp iterate_arg1_chars
-
-      pattern1_end_reached:
-        inc di ;ustaw di na poczatek nowego wzoraca
-        inc cl ;rozpatrywanie kolejnej cyfry
-
-      arg1_end_reached:   ;sprawdzanie, czy osiagnieto tez koniec wzorca
         mov al, '$'
         mov ah, byte ptr ds:[di]
         cmp ah, al
-        jz save_arg1_value
+        jz  pattern1_end_reached  ;osiagneto koniec wzorca
 
-      move_to_next_pattern1:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
-        inc di
+        mov al, ds:[si]
         mov ah, ds:[di]
+        cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
+        jz chars_match1
+        jmp move_to_next_pattern1 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
+
+
+        chars_match1:
+          inc di
+          inc si
+          jmp iterate_arg1_chars
+
+        pattern1_end_reached:
+          inc di ;ustaw di na poczatek nowego wzoraca
+          inc cl ;rozpatrywanie kolejnej cyfry
+          jmp parse_arg1_loop
+
+        arg1_end_reached:   ;sprawdzanie, czy osiagnieto tez koniec wzorca
+          mov al, '$'
+          mov ah, byte ptr ds:[di]
+          cmp ah, al
+          jz save_arg1_value
+
+        move_to_next_pattern1:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
+          inc di
+          mov ah, ds:[di]
+          mov al, '$'
+          cmp ah, al
+          jnz move_to_next_pattern1
+          inc di      ;ustaw di na poczatek kolejnego wzorca
+          inc cl
+          jmp parse_arg1_loop
+
+        save_arg1_value:
+          mov ax, offset first_arg
+          mov di, ax
+          mov al, cl
+          mov ds:[di], al
+          jmp arg2_parsing
+
+
+  arg2_parsing:
+    mov cl, 0
+    mov di, offset plus
+
+    parse_arg2_loop:
+      mov al, cl
+      mov ah, 3
+      cmp ah, al
+      jz invalid_second
+
+      mov ax, offset in_second_word
+      mov si, ax
+
+      iterate_arg2_chars:
         mov al, '$'
+        mov ah, byte ptr ds:[si]
         cmp ah, al
-        jnz move_to_next_pattern1
-        inc di      ;ustaw di na poczatek kolejnego wzorca
-        inc cl
-        jmp parse_arg1_loop
+        jz arg2_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
 
-      save_arg1_value:
-        mov al, cl
-        mov di, offset first_arg
-        mov ds:[di], al
-        jmp parse_arg2_loop
+        mov al, '$'
+        mov ah, byte ptr ds:[di]
+        cmp ah, al
+        jz  pattern2_end_reached  ;osiagneto koniec wzorca
 
-;      finalize arg1_loop:
-;        inc cl
-;    jmp parse_arg1_loop
+        mov al, ds:[si]
+        mov ah, ds:[di]
+        cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
+        jz chars_match2
+        jmp move_to_next_pattern2 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
 
-  parse_arg2_loop:
+
+        chars_match2:
+          inc di
+          inc si
+          jmp iterate_arg2_chars
+
+        pattern2_end_reached:
+          inc di ;ustaw di na poczatek nowego wzoraca
+          inc cl ;rozpatrywanie kolejnego operatora
+          jmp parse_arg2_loop
+
+        arg2_end_reached:   ;sprawdzanie, czy osiagnieto tez koniec wzorca
+          mov al, '$'
+          mov ah, byte ptr ds:[di]
+          cmp ah, al
+          jz save_arg2_value
+
+        move_to_next_pattern2:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
+          inc di
+          mov ah, ds:[di]
+          mov al, '$'
+          cmp ah, al
+          jnz move_to_next_pattern2
+          inc di      ;ustaw di na poczatek kolejnego wzorca
+          inc cl
+          jmp parse_arg2_loop
+
+        save_arg2_value:
+          mov al, cl
+          mov di, offset second_arg
+          mov ds:[di], al
+          jmp arg3_parsing
+
+
+  arg3_parsing:
+    mov cl, 0
+    mov di, offset zero
+
+    parse_arg3_loop:
+      mov al, cl
+      mov ah, 10
+      cmp ah, al
+      jz invalid_third
+
+      mov ax, offset in_third_word
+      mov si, ax
+
+      iterate_arg3_chars:
+        mov al, '$'
+        mov ah, byte ptr ds:[si]
+        cmp ah, al
+        jz arg3_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
+
+        mov al, '$'
+        mov ah, byte ptr ds:[di]
+        cmp ah, al
+        jz  pattern3_end_reached  ;osiagneto koniec wzorca
+
+        mov al, ds:[si]
+        mov ah, ds:[di]
+        cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
+        jz chars_match3
+        jmp move_to_next_pattern3 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
+
+
+        chars_match3:
+          inc di
+          inc si
+          jmp iterate_arg3_chars
+
+        pattern3_end_reached:
+          inc di ;ustaw di na poczatek nowego wzoraca
+          inc cl ;rozpatrywanie kolejnej cyfry
+          jmp parse_arg3_loop
+
+        arg3_end_reached:   ;sprawdzanie, czy osiagnieto tez koniec wzorca
+          mov al, '$'
+          mov ah, byte ptr ds:[di]
+          cmp ah, al
+          jz save_arg3_value
+
+        move_to_next_pattern3:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
+          inc di
+          mov ah, ds:[di]
+          mov al, '$'
+          cmp ah, al
+          jnz move_to_next_pattern3
+          inc di      ;ustaw di na poczatek kolejnego wzorca
+          inc cl
+          jmp parse_arg3_loop
+
+        save_arg3_value:
+          mov al, cl
+          mov di, offset third_arg
+          mov ds:[di], al
+          jmp make_operation
 
 ;////////////////////////////////////////////////////
 ;----------------------------------------------------
+
+  make_operation:
+    mov ax, offset second_arg
+    mov si, ax
+    mov al, ds:[si]
+    cmp al, 0
+    jz addition
+    cmp al, 1
+    jz subtraction
+    jmp multiplication
+
+  addition:
+    mov ax, offset first_arg
+    mov si, ax
+    mov ax, offset third_arg
+    mov di, ax
+    mov ah, ds:[si]
+    mov al, ds:[di]
+    add ah, al
+    mov dl, ah
+    mov ax, offset result
+    mov di, ax
+    mov byte ptr ds:[di], dl
+    jmp show_result
+
+  subtraction:
+    mov ax, offset first_arg
+    mov si, ax
+    mov ax, offset third_arg
+    mov di, ax
+    mov ah, ds:[si]
+    mov al, ds:[di]
+    cmp ah, al
+    jc swap_arguments_and_set_minus
+    sub ah, al
+    mov dl, ah
+    mov ax, offset result
+    mov di, ax
+    mov byte ptr ds:[di], dl
+    jmp show_result
+
+    swap_arguments_and_set_minus:
+    mov dl, ah
+    mov ah, al
+    mov al, dl
+    sub ah, al
+    mov dl, ah
+    mov ax, offset result
+    mov di, ax
+    mov byte ptr ds:[di], dl
+    mov ax, offset minus_flag
+    mov di, ax
+    mov byte ptr ds:[di], 1
+    jmp show_result
+
+  multiplication:
+    mov ax, offset first_arg
+    mov si, ax
+    mov ax, offset third_arg
+    mov di, ax
+    mov ah, 0
+    mov al, ds:[di]
+    mov ch, 0
+    mov cl, ds:[si]
+    mul cx
+    mov dl, al
+    mov ax, offset result
+    mov di, ax
+    mov byte ptr ds:[di], dl
+
+
+;//////////////////////////////////////////WYPISYWANIE WYNIKU
+
+  show_result:
+    mov dx, offset result_msg
+    mov ah, 9
+    int 21h
+
+    mov ax, offset minus_flag
+    mov si, ax
+    mov al, ds:[si]
+    cmp al, 0
+    jz number_size_check
+
+  show_minus:
+    mov dx, offset minus
+    mov ah, 9
+    int 21h
+    mov dx, offset space
+    mov ah, 9
+    int 21h
+
+  number_size_check:
+    mov si, offset result
+    mov ah, 20
+    mov al, ds:[si]
+    cmp ah, al
+    jc more_than_twenty   ;sprawdza, czy wynik mozna wypisac jednym slowem (czyli czy nie jest wiekszy niz 20)
+
+    mov cl, 0
+
+    select_number_loop:
+      cmp al, cl
+      jz print_number
+        move_to_next_number:
+        
+
+
+  print_number
+    mov
+
+  more_than_twenty:
 
 
   mov al, byte ptr ds:[error_code]
