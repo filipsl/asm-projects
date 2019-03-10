@@ -429,9 +429,9 @@ start:
     jmp show_result           ;przejscie do wypisania wyniku
 
     swap_arguments_and_set_minus:
-      push ah         ;zamiana miejsc argumentow z wykorzystaniem stosu
+      mov dl, ah    ;zamiana miejsc argumentow z wykorzystaniem DL
       mov ah, al
-      pop al
+      mov al, dl
       sub ah, al      ;wynik odejmowania zapisany w AH
       mov di, offset result
       mov byte ptr ds:[di], ah  ;zapisanie wyniku w pamieci
