@@ -1,21 +1,21 @@
-;Project 01 - Verbal calculator
+;Project 01 - Kalkulator slowny
 ;Created by Filip SLazyk
 ;AGH UST 2019
 
 
-;segment danych
+;;//////////////////////////SEGMENT DANYCH/////////////////////////////////////
 data1 segment
 
 new_ln_chars   db 10,13,'$'                                 ;nowa linia
-space          db " $"                                       ;spacja
-hello_msg      db "Enter description of calculation: $" ;wiadomosc startowa
+space          db " $"                                      ;spacja
+hello_msg      db "Enter description of calculation: $"     ;wiadomosc startowa
 result_msg     db "The result is: $"                        ;wiadomosc z wynikiem
-error_msg      db "Error - invalid input!$"            ;wiadmosc bledu - wprowadzono za malo lub za duzo argumentow
-err_first      db "Error - invalid first argument$"    ;wiadmosc bledu - bledny pierwszy argument
-err_second     db "Error - invalid second argument$"   ;wiadmosc bledu - bledny drugi argument
-err_third      db "Error - invalid third argument$"    ;wiadmosc bledu - bledny trzeci argument
+error_msg      db "Error - invalid input!$"                 ;wiadmosc bledu - wprowadzono za malo lub za duzo argumentow
+err_first      db "Error - invalid first argument$"         ;wiadmosc bledu - bledny pierwszy argument
+err_second     db "Error - invalid second argument$"        ;wiadmosc bledu - bledny drugi argument
+err_third      db "Error - invalid third argument$"         ;wiadmosc bledu - bledny trzeci argument
 
-;definicja nazw liczb
+;definicja nazw liczb - sluzy do weryfikacji wprowadzonych argumentow, jak i wypisywania wyniku
 zero      db "zero$"
 one       db "one$"
 two       db "two$"
@@ -26,7 +26,7 @@ six       db "six$"
 seven     db "seven$"
 eight     db "eight$"
 nine      db "nine$"
-
+;ponizsze definicje sluza juz tylko do wypisywania wyniku
 ten       db "ten$"
 eleven    db "eleven$"
 twelve    db "twelve$"
@@ -37,42 +37,49 @@ sixteen   db "sixteen$"
 seventeen db "seventeen$"
 eighteen  db "eighteen$"
 nineteen  db "nineteen$"
-
+;definicja nazw wielokrotnosci liczby dziesiec
 twenty    db "twenty$"
 thirty    db "thirty$"
 forty     db "forty$"
 fifty     db "fifty$"
 sixty     db "sixty$"
 seventy   db "seventy$"
-eighty    db "eighty$"
+eighty    db "eighty$" ;maksymalny wynik, jaki mozna uzyskac, to 81 = 9 * 9
+
 
 ;definicja nazw operacji
-plus  db "plus$"     ;kod operacji 0
-minus db "minus$"    ;kod operacji 1
-tim   db "times$"    ;kod operacji 2
+plus  db "plus$"     ;kod operacji = 0
+minus db "minus$"    ;kod operacji = 1
+tim   db "times$"    ;kod operacji = 2
 
 
-;bufor wejsciowy
+;bufor wejsciowy - sluzy do wczytywania wejscia
+;(przygotowany dla obslugi przerwania int 21 z parametrem AH = 0Ah)
 input_buffer:
-  size_of_buffer db 30
-  actual_size    db ?
-  buffer_memory  db 30 dup(0)
+  size_of_buffer db 30            ;maksymalny dopuszczalny rozmiar wejscia
+  actual_size    db ?             ;rozmiar wejscia wpisanego przez uzytkownika
+  buffer_memory  db 30 dup(0)     ;ciag bajtow odpowiadajacy kolejny wprowadzonym znakom
 
+;poszczegolne slowa wprowadzone przez uzytkownika
 in_first_word   db 30 dup(0)
 in_second_word  db 30 dup(0)
 in_third_word   db 30 dup(0)
 
+;wartosci liczbowe odpowiadajace poszczegolnym slowom (operacja ma swoj kod)
 first_arg       db 0
 second_arg      db 0
 third_arg       db 0
 
+;wynik dzialania
 result          db ?
-minus_flag      db 0
-
+minus_flag      db 0 ;jesli wykonywane jest odejmowanie, flaga minus ustawiana jest na 1
+                     ;(uzywane przy wypisywaniu wyjscia)
 data1 ends
 
 
-;segment programu
+
+
+;//////////////////////////SEGMENT PROGRAMU/////////////////////////////////////
 code1 segment
 
 start:
@@ -85,144 +92,149 @@ start:
   mov ax, seg input_buffer
   mov ds, ax
 
-  hello_message:
+  hello_message:              ;wyswietlenie wiadomosci powitalnej
     mov dx, offset hello_msg
     mov ah, 9
     int 21h
 
-  read_input:
+  read_input:                 ;buforowane wczytywanie wejscia
     mov dx, offset input_buffer
     mov ah, 0ah
     int 21h
 
-  call new_line
+  call new_line               ;przejscie do nowej linii
 
 ;///////////////////////////////////////////////////
 ;WSTEPNE SPRAWDZENIE POPRAWNOSCI WEJSCIA
+;///////////////////////////////////////////////////
 
-  ;sprawdzenie, czy na wejsciu znajduja sie trzy slowa
-  ;di przechowuje adres na aktualnie wczytywane slowo
+;sprawdzenie, czy na wejsciu znajduja sie trzy slowa
+;jesli nie, wyswietlany jest komunikat i program konczy sie
+
   input_check:
-    mov si, offset buffer_memory
-    skip_spaces0:
+    mov si, offset buffer_memory    ;rejestr SI wskazuje na poczatek bufora
+    skip_spaces0:                   ;usuwanie spacji na poczatku wejscia
       inc si
       mov al, byte ptr ds:[si-1]
-      cmp al, 20h  ;spacja
-      jz skip_spaces0
+      cmp al, 20h  ;ASCII 20h = spacja
+      jz skip_spaces0               ;SI przesuwane jest na kolejne bajty,
+                                    ;az zacznie wskazywac na znak rozny od spacji
 
-    mov di, offset in_first_word
-    arg1_loop:
-      cmp al, 0dh         ;Carriage Return
-      jz invalid_input
-      mov [di], al
-      inc di
+    mov di, offset in_first_word    ;DI wskazuje na pierwszy bajt pamieci, gdzie zapisane bedzie pierwsze slowo
+    arg1_loop:                      ;przetwarzanie pierwszego slowa
+      cmp al, 0dh         ;ASCII 0dh = Carriage Return
+      jz invalid_input    ;jesli tutaj program natrafia na CR, wprowadzono niewlasciwe wejscie
+      mov ds:[di], al     ;zapisywanie kolejnych bajtow pierwszego slowa do pamieci
+      inc di              ;przejscie do kolejnego bajtu wejscia i wyniku parsowania
       inc si
       mov al, byte ptr ds:[si-1]
-      cmp al, 20h
-      jnz arg1_loop
+      cmp al, 20h       ;ASCII 20h = spacja
+      jnz arg1_loop     ;jesli natrafiamy na spacje, oznacza to przejscie dalej
 
-    mov al, '$'
-    mov [di], al
+    mov al, '$'         ;na koniec pierwszego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
+    mov ds:[di], al
 
-    skip_spaces1:
-      inc si
+    skip_spaces1:      ;analogicznie, przechodzenie przez spacje miedzy pierwszym i drugim slowem
+      inc si           ;zwiekszamy SI tak dlugo, az bedzie wskazywac na znak inny od spacji
       mov al, byte ptr ds:[si-1]
-      cmp al, 20h  ;spacja
+      cmp al, 20h     ;ASCII 20h = spacja
       jz skip_spaces1
 
-    mov di, offset in_second_word
-    arg2_loop:
-      cmp al, 0dh         ;Carriage Return
-      jz invalid_input
-      mov [di], al
-      inc di
+    mov di, offset in_second_word ;DI wskazuje na pierwszy bajt pamieci, gdzie zapisane bedzie drugie slowo
+    arg2_loop:                    ;przetwarzanie drugiego slowa
+      cmp al, 0dh         ;ASCII 0dh = Carriage Return
+      jz invalid_input    ;jesli tutaj program natrafia na CR, wprowadzono niewlasciwe wejscie
+      mov ds:[di], al     ;zapisywanie kolejnych bajtow drugiego slowa do pamieci
+      inc di              ;przejscie do kolejnego bajtu wejscia i wyniku parsowania
       inc si
       mov al, byte ptr ds:[si-1]
-      cmp al, 20h
-      jnz arg2_loop
+      cmp al, 20h         ;ASCII 20h = spacja
+      jnz arg2_loop       ;jesli natrafiamy na spacje, oznacza to przejscie dalej
 
     mov al, '$'
-    mov [di], al
+    mov ds:[di], al       ;na koniec drugiego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
 
-    skip_spaces2:
-      inc si
+    skip_spaces2:         ;analogicznie, przechodzenie przez spacje miedzy drugim i trzecim slowem
+      inc si              ;zwiekszamy SI tak dlugo, az bedzie wskazywac na znak inny od spacji
       mov al, byte ptr ds:[si-1]
-      cmp al, 20h  ;spacja
+      cmp al, 20h         ;ASCII 20h = spacja
       jz skip_spaces2
 
-    cmp al, 0dh         ;Carriage Return
-    jz invalid_input
+    cmp al, 0dh         ;ASCII 0dh = Carriage Return
+    jz invalid_input    ;jesli natrafilismy na CR, oznacza to bledne wejscie
 
-    mov di, offset in_third_word
-    arg3_loop:
-      mov [di], al
-      inc di
+    mov di, offset in_third_word  ;DI wskazuje na pierwszy bajt pamieci, gdzie zapisane bedzie trzecie slowo
+    arg3_loop:                    ;przetwarzanie trzeciego slowa
+      mov ds:[di], al       ;zapisywanie kolejnych bajtow trzeciego slowa do pamieci
+      inc di                ;przejscie do kolejnego bajtu wejscia i wyniku parsowania
       inc si
       mov al, byte ptr ds:[si-1]
-      cmp al, 20h
-      jz check_excess
-      cmp al, 0dh
-      jnz arg3_loop
+      cmp al, 20h         ;ASCII 20h = spacja
+      jz check_excess     ;jesli po trzecim slowie jest spacja, sprawdzamy, czy nie ma nadmiarowego argumentu
+      cmp al, 0dh         ;ASCII 0dh = Carriage Return
+      jnz arg3_loop       ;po natrafieniu na CR, przechodzimy dalej
 
-    mov al, '$'
-    mov [di], al
-    jmp arg1_parsing
+    mov al, '$'         ;na koniec trzeciego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
+    mov ds:[di], al
+    jmp arg1_parsing    ;przejscie do przetwarzania poszczegolnych argumentow
 
-    check_excess:
-      mov al, '$'
+    check_excess:       ;dodatkowe sprawdzenie, czy trzeci argument jest ostatnim
+      mov al, '$'       ;na koniec trzeciego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
       mov [di], al
-      skip_spaces3:
+      skip_spaces3:     ;przechodzenie przez spacje miedzy trzecim slowem, a znakiem innym od spacji
         inc si
         mov al, byte ptr ds:[si-1]
-        cmp al, 20h  ;spacja
+        cmp al, 20h     ;ASCII 20h = spacja
         jz skip_spaces3
-      cmp al, 0dh
-      jnz invalid_input
-      jmp arg1_parsing
+      cmp al, 0dh       ;ASCII 0dh = Carriage Return
+      jnz invalid_input ;w przypadku wykrycia czwartego argumentu, wypisywany jest komunikat bledu, koniec programu
+      jmp arg1_parsing  ;w przeciwnym przypadku, przejscie do parsowania poszczegolnych argumentow
+
 ;///////////////////////////////////////////////////
-;---------------------------------------------------
+
 
 
 ;///////////////////////////////////////////////////
 ;WLASCIWE PARSOWANIE POSZCZEGOLNYCH ARGUMENTOW
+;///////////////////////////////////////////////////
 
-;CL -> aktualnie sprawdzana cyfra -> jesli dochodzi do 10, to znaczy, ze jest bledny argument
+;CL -> aktualnie rozpatrywana cyfra -> jesli dochodzi do 10 (lub 3 dla operatora dzialania),
+;      to znaczy, ze podano bledny argument
 ;SI -> ustawione na poczatek sprawdzanego obecnie argumentu
-;DI -> sluzy do iterowania po wzoracach slow oznaczajacych cyfry
+;DI -> sluzy do iterowania po wzoracach slow oznaczajacych cyfry (lub operatory)
 
+;///////// PIERWSZY ARGUMENT
   arg1_parsing:
     mov cl, 0
-    mov ax, offset zero
-    mov di, ax
+    mov di,  offset zero    ;DI ustawiony na poczatek wzorca "zero"
 
-    parse_arg1_loop:
+    parse_arg1_loop:        ;petla do rozpatrywania kolejnych cyfr
       mov al, cl
       mov ah, 10
       cmp ah, al
-      jz invalid_first
+      jz invalid_first      ;jesli licznik CL wskazuje wartosc 10, nie znaleziono wzorca
+                            ;=>bledny pierwszy argument
+      mov si, offset in_first_word ;SI wskazuje na pierwszy bajt pierwszego argumentu
 
-      mov ax, offset in_first_word
-      mov si, ax
-
-      iterate_arg1_chars:
+      iterate_arg1_chars:           ;przejscie po kolejnych bajtach wzorca i pierwszego argumentu
         mov al, '$'
         mov ah, byte ptr ds:[si]
         cmp ah, al
-        jz arg1_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
+        jz arg1_end_reached     ; ds:[si] = '$': osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
 
         mov al, '$'
         mov ah, byte ptr ds:[di]
         cmp ah, al
         jz  pattern1_end_reached  ;osiagneto koniec wzorca
 
-        mov al, ds:[si]
-        mov ah, ds:[di]
-        cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
+        mov al, byte ptr ds:[si]
+        mov ah, byte ptr ds:[di]
+        cmp ah, al                ;porownywanie danego znaku wzorca i argumentu
         jz chars_match1
         jmp move_to_next_pattern1 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
 
 
-        chars_match1:
+        chars_match1:           ;jesli znaki wzorca i wejscia sie zgadzaja, przejscie do kolejnych znakow
           inc di
           inc si
           jmp iterate_arg1_chars
@@ -236,58 +248,56 @@ start:
           mov al, '$'
           mov ah, byte ptr ds:[di]
           cmp ah, al
-          jz save_arg1_value
+          jz save_arg1_value  ;jesli tak, zapisanie wartosci odpowiadajacej pierwszemu slowu
 
-        move_to_next_pattern1:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
-          inc di
+        move_to_next_pattern1:  ;jesli nie osiagnieto konca wzorca, nalezy przesunac wskaznik DI na poczatek nowego wzorca
+          inc di                ;DI zwiekszane do momentu natrafienia na '$' - symbol konca wzorca
           mov ah, ds:[di]
           mov al, '$'
           cmp ah, al
           jnz move_to_next_pattern1
           inc di      ;ustaw di na poczatek kolejnego wzorca
-          inc cl
+          inc cl      ;rozpatrywanie kolejnej cyfry
           jmp parse_arg1_loop
 
-        save_arg1_value:
-          mov ax, offset first_arg
-          mov di, ax
+        save_arg1_value:       ;zapisanie wartosci odpowiadajacej wprowadzonemu slowu
+          mov di, offset first_arg
           mov al, cl
           mov ds:[di], al
-          jmp arg2_parsing
 
 
+;///////// DRUGI ARGUMENT
   arg2_parsing:
     mov cl, 0
-    mov di, offset plus
+    mov di,  offset plus    ;DI ustawiony na poczatek wzorca "plus"
 
-    parse_arg2_loop:
+    parse_arg2_loop:        ;petla do rozpatrywania kolejnych operacji arytmetycznych
       mov al, cl
       mov ah, 3
       cmp ah, al
-      jz invalid_second
+      jz invalid_second     ;jesli licznik CL wskazuje wartosc 3, nie znaleziono wzorca
+                            ;=>bledny drugi argument
+      mov si, offset in_second_word ;SI wskazuje na pierwszy bajt drugiego argumentu
 
-      mov ax, offset in_second_word
-      mov si, ax
-
-      iterate_arg2_chars:
+      iterate_arg2_chars:           ;przejscie po kolejnych bajtach wzorca i drugiego argumentu
         mov al, '$'
         mov ah, byte ptr ds:[si]
         cmp ah, al
-        jz arg2_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
+        jz arg2_end_reached     ; ds:[si] = '$': osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
 
         mov al, '$'
         mov ah, byte ptr ds:[di]
         cmp ah, al
         jz  pattern2_end_reached  ;osiagneto koniec wzorca
 
-        mov al, ds:[si]
-        mov ah, ds:[di]
-        cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
+        mov al, byte ptr ds:[si]
+        mov ah, byte ptr ds:[di]
+        cmp ah, al                ;porownywanie danego znaku wzorca i argumentu
         jz chars_match2
         jmp move_to_next_pattern2 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
 
 
-        chars_match2:
+        chars_match2:           ;jesli znaki wzorca i wejscia sie zgadzaja, przejscie do kolejnych znakow
           inc di
           inc si
           jmp iterate_arg2_chars
@@ -301,63 +311,61 @@ start:
           mov al, '$'
           mov ah, byte ptr ds:[di]
           cmp ah, al
-          jz save_arg2_value
+          jz save_arg2_value  ;jesli tak, zapisanie kodu operacji odpowiadajacej drugiemu slowu
 
-        move_to_next_pattern2:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
-          inc di
+        move_to_next_pattern2:  ;jesli nie osiagnieto konca wzorca, nalezy przesunac wskaznik DI na poczatek nowego wzorca
+          inc di                ;DI zwiekszane do momentu natrafienia na '$' - symbol konca wzorca
           mov ah, ds:[di]
           mov al, '$'
           cmp ah, al
           jnz move_to_next_pattern2
-          inc di      ;ustaw di na poczatek kolejnego wzorca
-          inc cl
+          inc di      ;ustaw DI na poczatek kolejnego wzorca
+          inc cl      ;rozpatrywanie kolejnej operacji
           jmp parse_arg2_loop
 
-        save_arg2_value:
-          mov al, cl
+        save_arg2_value:       ;zapisanie wartosci odpowiadajacej wprowadzonemu slowu
           mov di, offset second_arg
+          mov al, cl
           mov ds:[di], al
-          jmp arg3_parsing
 
-
+;///////// TRZECI ARGUMENT
   arg3_parsing:
     mov cl, 0
-    mov di, offset zero
+    mov di,  offset zero    ;DI ustawiony na poczatek wzorca "zero"
 
-    parse_arg3_loop:
+    parse_arg3_loop:        ;petla do rozpatrywania kolejnych cyfr
       mov al, cl
       mov ah, 10
       cmp ah, al
-      jz invalid_third
+      jz invalid_third      ;jesli licznik CL wskazuje wartosc 10, nie znaleziono wzorca
+                            ;=>bledny trzeci argument
+      mov si, offset in_third_word ;SI wskazuje na pierwszy bajt trzeciego argumentu
 
-      mov ax, offset in_third_word
-      mov si, ax
-
-      iterate_arg3_chars:
+      iterate_arg3_chars:           ;przejscie po kolejnych bajtach wzorca i trzeciego argumentu
         mov al, '$'
         mov ah, byte ptr ds:[si]
         cmp ah, al
-        jz arg3_end_reached     ;osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
+        jz arg3_end_reached     ; ds:[si] = '$': osiagneto koniec argumentu wejsciowego, sprawdzanie czy osiagneto tez koniec wzorca
 
         mov al, '$'
         mov ah, byte ptr ds:[di]
         cmp ah, al
         jz  pattern3_end_reached  ;osiagneto koniec wzorca
 
-        mov al, ds:[si]
-        mov ah, ds:[di]
-        cmp ah, al ;wlasciwe porownywanie danego znaku wzorca i argumentu
+        mov al, byte ptr ds:[si]
+        mov ah, byte ptr ds:[di]
+        cmp ah, al                ;porownywanie danego znaku wzorca i argumentu
         jz chars_match3
         jmp move_to_next_pattern3 ;jesli znaki sie nie zgadzaja, zacznij porownywanie z kolejnym wzorcem
 
 
-        chars_match3:
+        chars_match3:           ;jesli znaki wzorca i wejscia sie zgadzaja, przejscie do kolejnych znakow
           inc di
           inc si
           jmp iterate_arg3_chars
 
         pattern3_end_reached:
-          inc di ;ustaw di na poczatek nowego wzoraca
+          inc di ;ustaw DI na poczatek nowego wzoraca
           inc cl ;rozpatrywanie kolejnej cyfry
           jmp parse_arg3_loop
 
@@ -365,97 +373,84 @@ start:
           mov al, '$'
           mov ah, byte ptr ds:[di]
           cmp ah, al
-          jz save_arg3_value
+          jz save_arg3_value  ;jesli tak, zapisanie wartosci odpowiadajacej trzeciemu slowu
 
-        move_to_next_pattern3:  ;jesli nie osiagnieto, nalezy przesunac wskaznik DI na poczatek nowego wzorca
-          inc di
+        move_to_next_pattern3:  ;jesli nie osiagnieto konca wzorca, nalezy przesunac wskaznik DI na poczatek nowego wzorca
+          inc di                ;DI zwiekszane do momentu natrafienia na '$' - symbol konca wzorca
           mov ah, ds:[di]
           mov al, '$'
           cmp ah, al
           jnz move_to_next_pattern3
-          inc di      ;ustaw di na poczatek kolejnego wzorca
-          inc cl
+          inc di      ;ustaw DI na poczatek kolejnego wzorca
+          inc cl      ;rozpatrywanie kolejnej cyfry
           jmp parse_arg3_loop
 
-        save_arg3_value:
-          mov al, cl
+        save_arg3_value:       ;zapisanie wartosci odpowiadajacej wprowadzonemu slowu
           mov di, offset third_arg
+          mov al, cl
           mov ds:[di], al
-          jmp make_operation
-
 ;////////////////////////////////////////////////////
-;----------------------------------------------------
 
-  make_operation:
-    mov ax, offset second_arg
+
+;///////////////////////////////////////////////////
+;WYKONANIE OPERACJI NA PODANYCH LICZBACH
+;///////////////////////////////////////////////////
+
+  make_operation:         ;blok wyboru rodzaju operacji
+    mov ax, offset second_arg     ;drugi argument przechowuje kod operacji
     mov si, ax
-    mov al, ds:[si]
+    mov al, byte ptr ds:[si]
     cmp al, 0
-    jz addition
-    cmp al, 1
+    jz addition       ;kod operacji = 0 -> dodawanie
+    cmp al, 1         ;kod operacji = 1 -> odejmowanie
     jz subtraction
-    jmp multiplication
+    jmp multiplication  ;w przeciwnym przypdaku, kod operacji = 2 -> mnozenie
 
   addition:
-    mov ax, offset first_arg
-    mov si, ax
-    mov ax, offset third_arg
-    mov di, ax
-    mov ah, ds:[si]
-    mov al, ds:[di]
-    add ah, al
-    mov dl, ah
-    mov ax, offset result
-    mov di, ax
-    mov byte ptr ds:[di], dl
-    jmp show_result
+    mov si, offset first_arg ;SI wskazuje na pierwsza cyfre
+    mov di, offset third_arg ;DI wskazuje na druga cyfre
+    mov ah, byte ptr ds:[si]
+    mov al, byte ptr ds:[di]
+    add ah, al              ;wynik dodwania zapisany w AH
+    mov di, offset result
+    mov byte ptr ds:[di], ah ;zapisanie wyniku w pamieci
+    jmp show_result          ;przejscie do wypisania wyniku
 
   subtraction:
-    mov ax, offset first_arg
-    mov si, ax
-    mov ax, offset third_arg
-    mov di, ax
-    mov ah, ds:[si]
-    mov al, ds:[di]
+    mov si, offset first_arg
+    mov di, offset third_arg
+    mov ah, byte ptr ds:[si]
+    mov al, byte ptr ds:[di]
     cmp ah, al
-    jc swap_arguments_and_set_minus
-    sub ah, al
-    mov dl, ah
-    mov ax, offset result
-    mov di, ax
-    mov byte ptr ds:[di], dl
-    jmp show_result
+    jc swap_arguments_and_set_minus ;jesli a1 - a2 <0, wykonujemy dzialanie a2 - a1 i ustawiamy zmienna "minus_flag"
+    sub ah, al                      ;wynik odejmowania zapisany w AH
+    mov di, offset result
+    mov byte ptr ds:[di], ah  ;zapisanie wyniku w pamieci
+    jmp show_result           ;przejscie do wypisania wyniku
 
     swap_arguments_and_set_minus:
-    mov dl, ah
-    mov ah, al
-    mov al, dl
-    sub ah, al
-    mov dl, ah
-    mov ax, offset result
-    mov di, ax
-    mov byte ptr ds:[di], dl
-    mov ax, offset minus_flag
-    mov di, ax
-    mov byte ptr ds:[di], 1
-    jmp show_result
+      push ah         ;zamiana miejsc argumentow z wykorzystaniem stosu
+      mov ah, al
+      pop al
+      sub ah, al      ;wynik odejmowania zapisany w AH
+      mov di, offset result
+      mov byte ptr ds:[di], ah  ;zapisanie wyniku w pamieci
+      mov di, offset minus_flag
+      mov byte ptr ds:[di], 1   ;ustawienie wskaznika wypisania "minus" na wyjsciu
+      jmp show_result
 
   multiplication:
-    mov ax, offset first_arg
-    mov si, ax
-    mov ax, offset third_arg
-    mov di, ax
+    mov si, offset first_arg
+    mov di, offset third_arg
     mov ah, 0
-    mov al, ds:[di]
+    mov al, byte ptr ds:[di]  ;pobranie pierwszej cyfry z pamieci
     mov ch, 0
-    mov cl, ds:[si]
-    mul cx
-    mov dl, al
-    mov ax, offset result
-    mov di, ax
-    mov byte ptr ds:[di], dl
+    mov cl, byte ptr ds:[si]  ;pobranie drugiej cyfry z pamieci
+    mul cx                    ;wynik mnozenia zapisany w rejestrze AX
+    mov di, offset result
+    mov byte ptr ds:[di], al  ;zapisanie wyniku mnozenia w pamieci
 
-
+    
 ;//////////////////////////////////////////WYPISYWANIE WYNIKU
 
   show_result:
