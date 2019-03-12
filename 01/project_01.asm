@@ -61,9 +61,9 @@ input_buffer:
   buffer_memory  db 30 dup(0)     ;ciag bajtow odpowiadajacy kolejny wprowadzonym znakom
 
 ;poszczegolne slowa wprowadzone przez uzytkownika
-in_first_word   db 30 dup(0)
-in_second_word  db 30 dup(0)
-in_third_word   db 30 dup(0)
+in_first_word   db 30 dup('$')
+in_second_word  db 30 dup('$')
+in_third_word   db 30 dup('$')
 
 ;wartosci liczbowe odpowiadajace poszczegolnym slowom (operacja ma swoj kod)
 first_arg       db 0
@@ -99,7 +99,7 @@ start:
 
   read_input:                 ;buforowane wczytywanie wejscia
     mov dx, offset input_buffer
-    mov ah, 0ah
+    mov ah, 0ah               ;buforowane wczytywanie wejscia, dedykowane przerwanie systemu DOS
     int 21h
 
   call new_line               ;przejscie do nowej linii
@@ -124,15 +124,13 @@ start:
     arg1_loop:                      ;przetwarzanie pierwszego slowa
       cmp al, 0dh         ;ASCII 0dh = Carriage Return
       jz invalid_input    ;jesli tutaj program natrafia na CR, wprowadzono niewlasciwe wejscie
-      mov ds:[di], al     ;zapisywanie kolejnych bajtow pierwszego slowa do pamieci
+      mov byte ptr ds:[di], al     ;zapisywanie kolejnych bajtow pierwszego slowa do pamieci
       inc di              ;przejscie do kolejnego bajtu wejscia i wyniku parsowania
       inc si
       mov al, byte ptr ds:[si-1]
       cmp al, 20h       ;ASCII 20h = spacja
       jnz arg1_loop     ;jesli natrafiamy na spacje, oznacza to przejscie dalej
 
-    mov al, '$'         ;na koniec pierwszego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
-    mov ds:[di], al
 
     skip_spaces1:      ;analogicznie, przechodzenie przez spacje miedzy pierwszym i drugim slowem
       inc si           ;zwiekszamy SI tak dlugo, az bedzie wskazywac na znak inny od spacji
@@ -151,8 +149,6 @@ start:
       cmp al, 20h         ;ASCII 20h = spacja
       jnz arg2_loop       ;jesli natrafiamy na spacje, oznacza to przejscie dalej
 
-    mov al, '$'
-    mov ds:[di], al       ;na koniec drugiego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
 
     skip_spaces2:         ;analogicznie, przechodzenie przez spacje miedzy drugim i trzecim slowem
       inc si              ;zwiekszamy SI tak dlugo, az bedzie wskazywac na znak inny od spacji
@@ -174,13 +170,10 @@ start:
       cmp al, 0dh         ;ASCII 0dh = Carriage Return
       jnz arg3_loop       ;po natrafieniu na CR, przechodzimy dalej
 
-    mov al, '$'         ;na koniec trzeciego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
-    mov ds:[di], al
+
     jmp arg1_parsing    ;przejscie do przetwarzania poszczegolnych argumentow
 
     check_excess:       ;dodatkowe sprawdzenie, czy trzeci argument jest ostatnim
-      mov al, '$'       ;na koniec trzeciego slowa dodajemy znak '$' - dla latwiejszego przetwarzania
-      mov [di], al
       skip_spaces3:     ;przechodzenie przez spacje miedzy trzecim slowem, a znakiem innym od spacji
         inc si
         mov al, byte ptr ds:[si-1]
@@ -205,7 +198,7 @@ start:
 
 ;///////// PIERWSZY ARGUMENT
   arg1_parsing:
-    mov cl, 0
+    xor cl, cl
     mov di,  offset zero    ;DI ustawiony na poczatek wzorca "zero"
 
     parse_arg1_loop:        ;petla do rozpatrywania kolejnych cyfr
@@ -252,7 +245,7 @@ start:
 
         move_to_next_pattern1:  ;jesli nie osiagnieto konca wzorca, nalezy przesunac wskaznik DI na poczatek nowego wzorca
           inc di                ;DI zwiekszane do momentu natrafienia na '$' - symbol konca wzorca
-          mov ah, ds:[di]
+          mov ah, byte ptr ds:[di]
           mov al, '$'
           cmp ah, al
           jnz move_to_next_pattern1
@@ -263,12 +256,12 @@ start:
         save_arg1_value:       ;zapisanie wartosci odpowiadajacej wprowadzonemu slowu
           mov di, offset first_arg
           mov al, cl
-          mov ds:[di], al
+          mov byte ptr ds:[di], al
 
 
 ;///////// DRUGI ARGUMENT
   arg2_parsing:
-    mov cl, 0
+    xor cl, cl
     mov di,  offset plus    ;DI ustawiony na poczatek wzorca "plus"
 
     parse_arg2_loop:        ;petla do rozpatrywania kolejnych operacji arytmetycznych
@@ -315,7 +308,7 @@ start:
 
         move_to_next_pattern2:  ;jesli nie osiagnieto konca wzorca, nalezy przesunac wskaznik DI na poczatek nowego wzorca
           inc di                ;DI zwiekszane do momentu natrafienia na '$' - symbol konca wzorca
-          mov ah, ds:[di]
+          mov ah, byte ptr ds:[di]
           mov al, '$'
           cmp ah, al
           jnz move_to_next_pattern2
@@ -326,11 +319,11 @@ start:
         save_arg2_value:       ;zapisanie wartosci odpowiadajacej wprowadzonemu slowu
           mov di, offset second_arg
           mov al, cl
-          mov ds:[di], al
+          mov byte ptr ds:[di], al
 
 ;///////// TRZECI ARGUMENT
   arg3_parsing:
-    mov cl, 0
+    xor cl, cl
     mov di,  offset zero    ;DI ustawiony na poczatek wzorca "zero"
 
     parse_arg3_loop:        ;petla do rozpatrywania kolejnych cyfr
@@ -377,7 +370,7 @@ start:
 
         move_to_next_pattern3:  ;jesli nie osiagnieto konca wzorca, nalezy przesunac wskaznik DI na poczatek nowego wzorca
           inc di                ;DI zwiekszane do momentu natrafienia na '$' - symbol konca wzorca
-          mov ah, ds:[di]
+          mov ah, byte ptr ds:[di]
           mov al, '$'
           cmp ah, al
           jnz move_to_next_pattern3
@@ -388,7 +381,7 @@ start:
         save_arg3_value:       ;zapisanie wartosci odpowiadajacej wprowadzonemu slowu
           mov di, offset third_arg
           mov al, cl
-          mov ds:[di], al
+          mov byte ptr ds:[di], al
 ;////////////////////////////////////////////////////
 
 
@@ -484,7 +477,7 @@ start:
     jc more_than_twenty   ;sprawdza, czy wynik mozna wypisac jednym slowem (czyli czy nie jest wiekszy niz 20)
 
     print_single_number:  ;jesli wynik <= 20, znajdz odpowiednie slowo i je wypisz
-      mov cl, 0           ;akutalnie wybrany wzorzec
+      xor cl, cl           ;akutalnie wybrany wzorzec
       mov si, offset zero
 
       select_number_loop:
@@ -507,7 +500,7 @@ start:
     jmp exit
 
   more_than_twenty:   ;w AL zapisany jest wynik do wypisania
-    mov ah, 0
+    xor ah, ah
     mov ch, 10
     div ch            ;dzielenie wyniku przez 10, w AL wynik dzielenia, w AH reszta
     mov si, offset twenty
@@ -534,7 +527,7 @@ start:
 
     mov si, offset result
     mov al, byte ptr ds:[si]  ;pobranie z pamieci wyniku dzialania
-    mov ah, 0
+    xor ah, ah
     mov ch, 10
     div ch                    ;dzielenie wyniku przez 10, cyfra jednosci (reszta dzielenia) zapisana w AH
     mov al, ah                ;przeniesienie cyfry jednosci do AL, w celu ewentualnego wypisania
