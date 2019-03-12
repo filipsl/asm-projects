@@ -1,2 +1,6 @@
-;hello world
-;test comment
+;Project 02 - BMP Viewer
+;Created by Filip SLazyk
+;AGH UST 2019
+
+
+;;//////////////////////////SEGMENT DANYCH/////////////////////////////////////
